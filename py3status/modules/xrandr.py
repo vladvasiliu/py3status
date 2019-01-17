@@ -59,9 +59,8 @@ Configuration parameters:
         (default '=')
     icon_extend: icon used to display a 'extend' combination
         (default '+')
-    on_udev_drm: dynamic variable to watch for `drm` udev subsystem events to
-        trigger specified action.
-        (default 'refresh_and_freeze')
+    on_udev: specify a list of 2-tuples, eg (subsystem, action)
+        (default [("drm", "refresh_and_freeze")])
     output_combinations: string used to define your own subset of output
         combinations to use, instead of generating every possible combination
         automatically. Provide the values in the format that this module uses,
@@ -162,7 +161,7 @@ class Py3status:
     hide_if_single_combination = False
     icon_clone = "="
     icon_extend = "+"
-    on_udev_drm = "refresh_and_freeze"
+    on_udev = [("drm", "refresh_and_freeze")]
     output_combinations = None
 
     class Meta:

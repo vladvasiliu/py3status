@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from py3status.constants import ON_TRIGGER_ACTIONS
+from py3status.constants import UDEV_ACTIONS
 
 try:
     import pyudev
@@ -32,7 +32,7 @@ class UdevMonitor:
         self.udev_observer.start()
         self.py3_wrapper.log("udev monitoring enabled")
 
-    def _udev_event(self, action, device):
+    def _udev_event(self, device, action):
         """
         This is a callback method that will trigger a refresh on subscribers.
         """
@@ -41,7 +41,7 @@ class UdevMonitor:
         # )
         self.trigger_actions(device.subsystem)
 
-    def subscribe(self, py3_module, trigger_action, subsystem):
+    def subscribe(self, py3_module, subsystem, trigger_action):
         """
         Subscribe the given module to the given udev subsystem.
 
@@ -52,7 +52,7 @@ class UdevMonitor:
             # lazy load the udev monitor
             if self.udev_observer is None:
                 self._setup_pyudev_monitoring()
-            if trigger_action not in ON_TRIGGER_ACTIONS:
+            if trigger_action not in UDEV_ACTIONS:
                 self.py3_wrapper.log(
                     "module %s: invalid action %s on udev events subscription"
                     % (py3_module.module_full_name, trigger_action)
@@ -76,7 +76,7 @@ class UdevMonitor:
         Refresh all modules which subscribed to the given subsystem.
         """
         for py3_module, trigger_action in self.udev_consumers[subsystem]:
-            if trigger_action in ON_TRIGGER_ACTIONS:
+            if trigger_action in UDEV_ACTIONS:
                 self.py3_wrapper.log(
                     "%s udev event, refresh consumer %s"
                     % (subsystem, py3_module.module_full_name)

@@ -214,7 +214,7 @@ COLOR_NAMES = {
     "yellowgreen": "#9ACD32",
 }
 
-ON_TRIGGER_ACTIONS = ["refresh", "refresh_and_freeze"]
+UDEV_ACTIONS = ["refresh", "refresh_and_freeze"]
 
 POSITIONS = ["left", "center", "right"]
 

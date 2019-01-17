@@ -36,9 +36,8 @@ Configuration parameters:
     notify_low_level: display notification when battery is running low (when
         the battery level is less than 'threshold_degraded')
         (default False)
-    on_udev_power_supply: dynamic variable to watch for `power_supply` udev subsystem
-        events to trigger specified action.
-        (default "refresh")
+    on_udev: specify a list of 2-tuples, eg (subsystem, action)
+        (default [("power_supply", "refresh")])
     sys_battery_path: set the path to your battery(ies), without including its
         number
         (default "/sys/class/power_supply/")
@@ -117,7 +116,7 @@ class Py3status:
     measurement_mode = MEASUREMENT_MODE
     notification = False
     notify_low_level = False
-    on_udev_power_supply = "refresh"
+    on_udev = [("power_supply", "refresh")]
     sys_battery_path = SYS_BATTERY_PATH
     threshold_bad = 10
     threshold_degraded = 30

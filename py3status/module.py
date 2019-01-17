@@ -7,7 +7,7 @@ from time import time
 from random import randint
 
 from py3status.composite import Composite
-from py3status.constants import MARKUP_LANGUAGES, POSITIONS
+from py3status.constants import MARKUP_LANGUAGES, POSITIONS, UDEV_ACTIONS
 from py3status.py3 import Py3, PY3_CACHE_FOREVER, ModuleErrorException
 from py3status.profiling import profile
 from py3status.formatter import Formatter
@@ -128,6 +128,16 @@ class Module:
             py_mod = getattr(py_mod, comp)
         class_inst = py_mod.Py3status()
         return class_inst
+
+    @staticmethod
+    def make_quotes(options):
+        """
+        Backtick the options.
+        """
+        x = ["`{}`".format(x) for x in options]
+        if len(x) > 2:
+            x = [", ".join(x[:-1]), x[-1]]
+        return " or ".join(x)
 
     def prepare_module(self):
         """
@@ -316,12 +326,6 @@ class Module:
         self.py3status_module_options = {}
         fn = self._py3_wrapper.get_config_attribute
 
-        def make_quotes(options):
-            x = ["`{}`".format(x) for x in options]
-            if len(x) > 2:
-                x = [", ".join(x[:-1]), x[-1]]
-            return " or ".join(x)
-
         # i3bar
         min_width = fn(self.module_full_name, "min_width")
         if not hasattr(min_width, "none_setting"):
@@ -335,7 +339,7 @@ class Module:
             if not hasattr(align, "none_setting"):
                 if align not in POSITIONS:
                     err = "Invalid `align` attribute, should be "
-                    err += make_quotes(POSITIONS)
+                    err += self.make_quotes(POSITIONS)
                     err += ". Got `{}`.".format(align)
                     raise ValueError(err)
                 self.i3bar_module_options["align"] = align
@@ -402,7 +406,7 @@ class Module:
             if not hasattr(position, "none_setting"):
                 if position not in POSITIONS:
                     err = "Invalid `position` attribute, should be "
-                    err += make_quotes(POSITIONS)
+                    err += self.make_quotes(POSITIONS)
                     err += ". Got `{}`.".format(position)
                     raise ValueError(err)
                 self.py3status_module_options["position"] = position
@@ -412,7 +416,7 @@ class Module:
         if not hasattr(markup, "none_setting"):
             if markup not in MARKUP_LANGUAGES:
                 err = "Invalid `markup` attribute, should be "
-                err += make_quotes(MARKUP_LANGUAGES)
+                err += self.make_quotes(MARKUP_LANGUAGES)
                 err += ". Got `{}`.".format(markup)
                 raise ValueError(err)
             self.i3bar_module_options["markup"] = markup
@@ -782,12 +786,36 @@ class Module:
             if not hasattr(self.module_class, "py3"):
                 setattr(self.module_class, "py3", Py3(self))
 
-            # Subscribe to udev events if on_udev_* dynamic variables are
-            # configured on the module
-            for param in dir(self.module_class):
-                if param.startswith("on_udev_"):
-                    trigger_action = getattr(self.module_class, param)
-                    self.add_udev_trigger(trigger_action, param[8:])
+            # on_udev
+            on_udev = getattr(self.module_class, "on_udev", None)
+            if on_udev:
+                if not isinstance(on_udev, list):
+                    err = "Invalid `on_udev` attribute, should be a list"
+                    err += ". Got `{}`.".format(on_udev)
+                    raise TypeError(err)
+                for param in on_udev:
+                    if not isinstance(param, tuple) or len(param) != 2:
+                        err = "Invalid `on_udev` item, should be a 2-tuple"
+                        err = "of (subsystem, action)"
+                        err += ". Got `{}`.".format(param)
+                        raise ValueError(err)
+                    elif not isinstance(param[0], basestring):
+                        err = "Invalid `on_udev` subsystem, should be a string"
+                        err += ". Got `{}`.".format(param[0])
+                        raise TypeError(err)
+                    elif param[1] not in UDEV_ACTIONS:
+                        err = "Invalid `on_udev` action, should be "
+                        err += self.make_quotes(UDEV_ACTIONS)
+                        err += ". Got `{}`.".format(param[1])
+                        raise ValueError(err)
+                    self.add_udev_trigger(param[0], param[1])
+            else:
+                # legacy: Subscribe to udev events if on_udev_* variables are
+                # configured on the module (old 60+ items vs new 0+N items)
+                for param in dir(self.module_class):
+                    if param.startswith("on_udev_"):
+                        trigger_action = getattr(self.module_class, param)
+                        self.add_udev_trigger(trigger_action, param[8:])
 
             # allow_urgent
             param = fn(self.module_full_name, "allow_urgent")
@@ -1080,11 +1108,11 @@ class Module:
                 # this would be stupid to die on exit
                 pass
 
-    def add_udev_trigger(self, trigger_action, subsystem):
+    def add_udev_trigger(self, subsystem, trigger_action):
         """
         Subscribe to the requested udev subsystem and apply the given action.
         """
-        if self._py3_wrapper.udev_monitor.subscribe(self, trigger_action, subsystem):
+        if self._py3_wrapper.udev_monitor.subscribe(self, subsystem, trigger_action):
             if trigger_action == "refresh_and_freeze":
                 # FIXME: we may want to disable refresh instead of using cache_timeout
                 self.module_class.cache_timeout = PY3_CACHE_FOREVER
