@@ -122,7 +122,7 @@ class Py3status:
         try:
             devices = get_connected_devices()
         except dbus.DBusException:
-            self.py3.error(STRING_NOT_STARTED)
+            self.py3.error(STRING_NOT_STARTED, self.py3.CACHE_FOREVER)
 
         if devices:
             data = []

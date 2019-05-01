@@ -225,7 +225,7 @@ class Py3status:
         if data and self.first_use:
             self.first_use = False
             if not is_equal:
-                self.py3.error("bad markets")
+                self.py3.error("invalid markets", self.py3.CACHE_FOREVER)
             else:
                 self._update_limit(data)
         elif not is_equal:

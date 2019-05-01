@@ -482,7 +482,7 @@ class Py3status:
         # if state is less than 8, we are not connected. skip.
         # if state is 8 or more, we are connected. start work.
         if wwan_data[key] == -1:
-            self.py3.error(STRING_MODEM_ERROR)
+            self.py3.error(STRING_MODEM_ERROR, self.py3.CACHE_FOREVER)
         elif wwan_data[key] < 8:
             pass
         else:

@@ -40,6 +40,8 @@ import shlex
 from subprocess import Popen, PIPE
 from threading import Thread
 
+STRING_ERROR = "missing `script_path`"
+
 
 class Py3status:
     """
@@ -52,14 +54,14 @@ class Py3status:
     strip_output = False
 
     def post_config_hook(self):
+        if not self.script_path:
+            raise Exception(STRING_ERROR)
+
         # class variables:
         self.command_thread = Thread()
         self.command_output = None
         self.command_color = None
         self.command_error = None  # cannot throw self.py3.error from thread
-
-        if not self.script_path:
-            self.py3.error("script_path is mandatory")
 
     def async_script(self):
         response = {}

@@ -88,7 +88,8 @@ class Py3status:
             data = vars(response)
             error = data.get("_error_message")
             if error:
-                self.py3.error("{} {}".format(error, data["_status_code"]))
+                msg = "{} {}".format(error, data["_status_code"])
+                self.py3.error(msg, self.py3.CACHE_FOREVER)
         return data
 
     def twitch(self):

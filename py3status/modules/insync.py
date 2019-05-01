@@ -38,7 +38,6 @@ offline
 {'color': '#FF0000', 'full_text': u'OFFLINE 3'}
 """
 
-STRING_ERROR = "Insync: isn't running"
 STRING_NOT_INSTALLED = "not installed"
 STRING_UNEXPECTED = "Insync: N/A"
 
@@ -92,7 +91,7 @@ class Py3status:
         color = self.py3.COLOR_DEGRADED
         format = self.format
         if status == "Insync doesn't seem to be running. Start it first.":
-            self.py3.error(STRING_ERROR)
+            self.py3.error(status, self.py3.CACHE_FOREVER)
         elif status == "OFFLINE":
             color = self.py3.COLOR_BAD
             status = self.status_offline

@@ -188,7 +188,7 @@ class Py3status:
                 aqi_data = self._organize(aqi_data)
                 aqi_data = self._manipulate(aqi_data)
             elif aqi_data.get("status") == "error":
-                self.py3.error(aqi_data.get("data"))
+                self.py3.error(aqi_data.get("data"), self.py3.CACHE_FOREVER)
 
         return {
             "cached_until": self.py3.time_in(self.cache_timeout),

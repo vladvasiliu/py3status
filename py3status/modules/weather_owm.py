@@ -439,7 +439,8 @@ class Py3status:
                 msg = data["message"]
             else:
                 msg = "{_error_message} {_status_code}".format(**vars(req))
-            self.py3.error(msg)
+            msg += " {}".format(url)
+            self.py3.error(msg, self.py3.CACHE_FOREVER)
 
         return req.json()
 
