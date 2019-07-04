@@ -64,8 +64,10 @@ class Py3status:
             self._event.set()
 
     def _callback(self, ev):
-        if ev.facility == PulseEventFacilityEnum.server or \
-           ev.facility == PulseEventFacilityEnum.sink and ev.index == self._sink.index:
+        print(ev)
+        if ev.t == PulseEventTypeEnum.change and \
+                (ev.facility == PulseEventFacilityEnum.server or
+                 ev.facility == PulseEventFacilityEnum.sink and ev.index == self._sink.index):
             raise PulseLoopStop
 
     def _pulse_reader(self):
