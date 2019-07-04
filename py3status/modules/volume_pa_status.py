@@ -27,7 +27,7 @@ class StopController(Exception):
 
 
 class Py3status:
-    _py3: Py3
+    py3: Py3
 
     def __init__(self, sink_name: Optional[str] = None, volume_boost: bool = False):
         """
@@ -39,7 +39,6 @@ class Py3status:
         self._volume_boost = volume_boost
         self._pulse_connector = Pulse('py3status-pulse-connector', threading_lock=True)
         self._command_queue = Queue()
-        self._event = threading.Event()     # Something has changed in the backend
         self._pulse_connector_lock = threading.Lock()
         self._volume: Optional[float] = None
         self._reader_thread = threading.Thread
@@ -61,10 +60,9 @@ class Py3status:
         pulse_volume = self._pulse_connector.volume_get_all_chans(self._sink)
         if self._volume != pulse_volume:
             self._volume = pulse_volume
-            self._event.set()
+            self.py3.update()
 
     def _callback(self, ev):
-        print(ev)
         if ev.t == PulseEventTypeEnum.change and \
                 (ev.facility == PulseEventFacilityEnum.server or
                  ev.facility == PulseEventFacilityEnum.sink and ev.index == self._sink.index):
@@ -78,6 +76,9 @@ class Py3status:
             except PulseDisconnected:
                 logger.debug("Pulse disconnected. Stopping reader.")
                 break
+
+    def _integer_volume(self):
+        return round(self._volume * 100)
 
     def post_config_hook(self):
         self._pulse_connector.connect()
@@ -94,7 +95,7 @@ class Py3status:
         response = {
             "cached_until": self.py3.CACHE_FOREVER,
             "color": "blue",
-            "full_text": f"Vol: {self._volume}%",
+            "full_text": f"Vol: {self._integer_volume()}%",
         }
         return response
 
