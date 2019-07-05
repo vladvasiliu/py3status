@@ -6,11 +6,12 @@ Pulse Audio Volume control.
 @license BSD
 """
 
-from functools import partial
+from __future__ import annotations
+
 import logging
-from queue import Queue
+from dataclasses import dataclass
 import threading
-from typing import Optional
+from typing import Callable, Iterable, Optional
 
 from pulsectl import Pulse, PulseEventMaskEnum, PulseEventTypeEnum, PulseEventFacilityEnum, PulseSinkInfo, \
     PulseDisconnected, PulseLoopStop
@@ -22,12 +23,45 @@ logger = logging.getLogger("main")
 logging.basicConfig(level=logging.DEBUG)
 
 
-class StopController(Exception):
-    pass
+@dataclass(frozen=True)
+class Volume:
+    """Holds normalized (integer) volume and mute status
+
+    The volume will be displayed as an integer. The output will only be updated if the value changes.
+    Therefore we do the conversion here so as to avoid "false positives" due to float comparisons.
+
+    As the sink returns a volume level per channel, which is basically a list of values,
+    those values must be aggregated into a single value.
+    By default `max` is called, but this can be replaced with any function that takes an iterable of floats and returns
+    a float.
+
+    Volume is a positive integer:
+    * 0: No sound
+    * 100: 100% hardware level
+    * >100: software amplification
+    See PulseAudio documentation for volume levels (https://freedesktop.org/software/pulseaudio/doxygen/volume.html).
+    """
+    level: int
+    mute: bool
+
+    @classmethod
+    def from_sink_info(cls, sink_info: PulseSinkInfo, cmp: Callable[[Iterable], float] = max) -> Volume:
+        float_vol = cmp(sink_info.volume.values)
+        return cls(level=round(100 * float_vol), mute=bool(sink_info.mute))
 
 
 class Py3status:
     py3: Py3
+    blocks = u"_▁▂▃▄▅▆▇█"
+    button_down = 5
+    button_mute = 1
+    button_up = 4
+    format = u"[\?if=is_input 😮|♪]: {percentage}%"
+    format_muted = u"[\?if=is_input 😶|♪]: muted"
+    is_input = False
+    max_volume = 100
+    thresholds = [(0, "bad"), (20, "degraded"), (50, "good")]
+    volume_delta = 5
 
     def __init__(self, sink_name: Optional[str] = None, volume_boost: bool = False):
         """
@@ -35,29 +69,24 @@ class Py3status:
         :param sink_name:  Sink name to use. Empty uses default sink
         :param volume_boost: Whether to allow setting volume above 1.0 - uses software boost
         """
-        self._sink: Optional[PulseSinkInfo]
+        self._sink_name = sink_name
+        self._sink_info: Optional[PulseSinkInfo]
         self._volume_boost = volume_boost
         self._pulse_connector = Pulse('py3status-pulse-connector', threading_lock=True)
-        self._command_queue = Queue()
         self._pulse_connector_lock = threading.Lock()
-        self._volume: Optional[float] = None
-        self._reader_thread = threading.Thread
-        self._writer_thread = threading.Thread
+        self._volume: Optional[Volume] = None
+        self._backend_thread = threading.Thread
 
-    # @property
-    # def volume(self) -> int:
-    #     return self._pulse_connector.volume_get_all_chans(self._sink)
-    #
-    # @volume.setter
-    # def volume(self, value):
-    #     if not self._volume_boost:
-    #         value = max(1.0, value)
-    #     self._pulse_connector.volume_set_all_chans(self._sink, value)
+    def _get_volume_from_backend(self):
+        """Get a new sink on every call.
 
-    def _get_volume(self):
+        The sink is not updated when the backed values change.
+        Returned volume is the maximum of all available channels.
+        """
         sink_name = self._pulse_connector.server_info().default_sink_name
-        self._sink = self._pulse_connector.get_sink_by_name(sink_name)
-        pulse_volume = self._pulse_connector.volume_get_all_chans(self._sink)
+        self._sink_info = self._pulse_connector.get_sink_by_name(sink_name)
+        pulse_volume = Volume.from_sink_info(self._sink_info)
+        logger.debug(pulse_volume)
         if self._volume != pulse_volume:
             self._volume = pulse_volume
             self.py3.update()
@@ -65,27 +94,24 @@ class Py3status:
     def _callback(self, ev):
         if ev.t == PulseEventTypeEnum.change and \
                 (ev.facility == PulseEventFacilityEnum.server or
-                 ev.facility == PulseEventFacilityEnum.sink and ev.index == self._sink.index):
+                 ev.facility == PulseEventFacilityEnum.sink and ev.index == self._sink_info.index):
             raise PulseLoopStop
 
     def _pulse_reader(self):
         while True:
             try:
                 self._pulse_connector.event_listen()
-                self._get_volume()
+                self._get_volume_from_backend()
             except PulseDisconnected:
                 logger.debug("Pulse disconnected. Stopping reader.")
                 break
 
-    def _integer_volume(self):
-        return round(self._volume * 100)
-
     def post_config_hook(self):
         self._pulse_connector.connect()
-        self._get_volume()
+        self._get_volume_from_backend()
         self._pulse_connector.event_mask_set(PulseEventMaskEnum.server, PulseEventMaskEnum.sink)
         self._pulse_connector.event_callback_set(self._callback)
-        self._reader_thread = threading.Thread(name="pulse_reader", target=self._pulse_reader).start()
+        self._backend_thread = threading.Thread(name="pulse_backend", target=self._pulse_reader).start()
 
     def kill(self):
         logger.info("Shutting down")
@@ -95,7 +121,7 @@ class Py3status:
         response = {
             "cached_until": self.py3.CACHE_FOREVER,
             "color": "blue",
-            "full_text": f"Vol: {self._integer_volume()}%",
+            "full_text": f"Vol: {self._volume.level}%",
         }
         return response
 
