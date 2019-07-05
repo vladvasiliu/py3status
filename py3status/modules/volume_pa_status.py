@@ -58,11 +58,11 @@ class Py3status:
     button_down = 5
     button_mute = 1
     button_up = 4
-    format = u"[\?if=is_input 😮|♪]: {percentage}%"
-    format_muted = u"[\?if=is_input 😶|♪]: muted"
+    format = u"{icon} {percentage}%"
+    format_muted = u"{icon} {percentage}%"
     is_input = False
     max_volume = 100
-    thresholds = [(0, "bad"), (20, "degraded"), (50, "good")]
+    thresholds = [(0, "good"), (75, "degraded"), (100, "bad")]
     volume_delta = 5
 
     def __init__(self, sink_name: Optional[str] = None, volume_boost: bool = False):
@@ -131,7 +131,7 @@ class Py3status:
             min(
                 len(self.blocks) - 1,
                 int(math.ceil(self._volume.level / 100 * (len(self.blocks) - 1))),
-                )
+            )
         ]
 
     def _format_output(self) -> Union[str, Composite]:
