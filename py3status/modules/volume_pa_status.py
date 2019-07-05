@@ -9,13 +9,15 @@ Pulse Audio Volume control.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 import threading
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, Union
 
 from pulsectl import Pulse, PulseEventMaskEnum, PulseEventTypeEnum, PulseEventFacilityEnum, PulseSinkInfo, \
     PulseDisconnected, PulseLoopStop
 
+from py3status.composite import Composite
 from py3status.py3 import Py3
 
 
@@ -117,11 +119,31 @@ class Py3status:
         logger.info("Shutting down")
         self._pulse_connector.disconnect()
 
+    def _color_for_output(self) -> str:
+        if self._volume is None:
+            return self.py3.COLOR_BAD
+        if self._volume.mute:
+            return self.py3.COLOR_MUTED or self.py3.COLOR_BAD
+        return self.py3.threshold_get_color(self._volume.level)
+
+    def _icon_for_output(self) -> str:
+        return self.blocks[
+            min(
+                len(self.blocks) - 1,
+                int(math.ceil(self._volume.level / 100 * (len(self.blocks) - 1))),
+                )
+        ]
+
+    def _format_output(self) -> Union[str, Composite]:
+        return self.py3.safe_format(format_string=self.format_muted if self._volume.mute else self.format,
+                                    param_dict={"icon": self._icon_for_output(),
+                                                "percentage": self._volume.level})
+
     def volume_status(self):
         response = {
             "cached_until": self.py3.CACHE_FOREVER,
-            "color": "blue",
-            "full_text": f"Vol: {self._volume.level}%",
+            "color": self._color_for_output(),
+            "full_text": self._format_output()
         }
         return response
 
